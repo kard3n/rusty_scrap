@@ -89,6 +89,7 @@ impl<'a> Element<'a> {
         last_char_lower_than: bool,
     ) -> IteratorResultElement<'a> {
         let mut current = iter.next();
+        let mut last_was_escape = false;
 
         if current.is_none() {
             return IteratorResultElement::End;
@@ -97,7 +98,12 @@ impl<'a> Element<'a> {
         if current.unwrap().1 != '<' && !last_char_lower_than {
             // Text element
             let start_pos: usize = current.unwrap().0;
-            while current.is_some() && current.unwrap().1 != '<' {
+            while current.is_some() && !(current.unwrap().1 == '<' && !last_was_escape) {
+                if current.unwrap().1 == '\\' {
+                    last_was_escape = true;
+                } else if last_was_escape {
+                    last_was_escape = false;
+                }
                 current = iter.next();
             }
 
@@ -177,15 +183,20 @@ impl<'a> Element<'a> {
                     // Check that the element was closed properly
                     match next_child {
                         IteratorResultElement::ClosingTag(n) => {
-                            if name != &n[1..]{
-                                panic!()
+                            if name != &n[1..] {
+                                panic!(
+                                    "Name of the closing tag ('{}') does not match name of the opening tag ('{}') at {}.",
+                                    &n,
+                                    name,
+                                    element_start - 1
+                                )
                             }
-
                         }
                         _ => {
                             panic!(
                                 "Element '{}' at position {} did not have a closing tag!",
-                                name, element_start
+                                name,
+                                element_start - 1
                             );
                         }
                     }
@@ -376,8 +387,8 @@ fn extract_tag<'a>(
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
     use crate::html_element::{extract_attributes, Child, Element, TerminalValue};
+    use std::ops::Deref;
 
     #[test]
     fn test_extract_attributes() {
@@ -414,7 +425,7 @@ mod tests {
         match result {
             Element::Named(e) => {
                 assert_eq!(e.name, "img");
-            },
+            }
             _ => panic!("{:?}", result),
         }
     }
@@ -517,6 +528,48 @@ mod tests {
                 }
             }
             other => panic!("{:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_ignore_escaped_opening(){
+        let source_one: &str = "<div>To end a div, use \\</t>!</div>";
+        let source_two: &str = "<div>\\</t></div>";
+        
+        let expected_inner_one = "To end a div, use \\</t>!";
+        let expected_inner_two = "\\</t>";
+        
+        let result_one = Element::from_string(&source_one);
+        let result_two = Element::from_string(&source_two);
+        
+        compare_inner_text_element(result_one, expected_inner_one);
+        compare_inner_text_element(result_two, expected_inner_two);
+    }
+    
+    fn compare_inner_text_element(result: Element, expected: &str) {
+        match result {
+            Element::Named(n) => {
+                assert_eq!(n.name, "div");
+                match n.child {
+                    Child::Nodes(children) => {
+                        assert_eq!(children.len(), 1);
+                        match &children[0] {
+                            Element::Text(t) => {
+                                assert_eq!(t.deref(), expected);
+                            }
+                            _ => {
+                                panic!("Unexpected named child");
+                            }
+                        }
+                    }
+                    _ => {
+                        panic! {"Expected nodes, got None"}
+                    }
+                }
+            }
+            _ => {
+                panic!("{:?}", result)
+            }
         }
     }
 }
