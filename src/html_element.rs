@@ -1,9 +1,17 @@
-static WHITESPACE_SYMBOLS: [char; 3] = [' ', '\t', '\n'];
-static SELF_CLOSING_TAGS: [&str; 14] = [
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
-    "wbr", "!DOCTYPE"
+const WHITESPACE_SYMBOLS: [char; 3] = [' ', '\t', '\n'];
+const VALID_TAG_CHARS: [char; 64] = [
+    'A','B','C','D','E','F','G','H','I','J','K','L','M',
+    'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+    'a','b','c','d','e','f','g','h','i','j','k','l','m',
+    'n','o','p','q','r','s','t','u','v','w','x','y','z',
+    '0','1','2','3','4','5','6','7','8','9',
+    '-', '.'
 ];
-static CHILDLESS_TAGS: [&str; 4] = ["script", "style", "textarea", "title"];
+const SELF_CLOSING_TAGS: [&str; 13] = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
+    "wbr",
+];
+const CHILDLESS_TAGS: [&str; 4] = ["script", "style", "textarea", "title"];
 
 #[derive(Debug)]
 pub enum TerminalValue<'a> {
@@ -163,7 +171,12 @@ impl<'a> Element<'a> {
                 };
                 let mut child_nodes: Vec<Element<'a>> = Vec::new();
 
-                if CHILDLESS_TAGS.contains(&name) {
+                if name.starts_with('!') {
+                    return IteratorResultElement::Element {
+                        element: Element::Named(NamedElement::new(name, attributes, Child::None)),
+                        last_char: '_',
+                    };
+                } else if CHILDLESS_TAGS.contains(&name) {
                     // Childless tag, only need to look for it's closing tag. Ignore everything until it was found
 
                     current = iter.next(); // Jump > after name
@@ -184,7 +197,9 @@ impl<'a> Element<'a> {
                             pattern_iter = pattern.chars();
                             pattern_current = pattern_iter.next();
                         }
-                        current = iter.next();
+                        if pattern_current.is_some() { // Only go to next if we aren't at the end
+                            current = iter.next();
+                        }
                     }
 
                     if pattern_current.is_none() {
@@ -200,7 +215,7 @@ impl<'a> Element<'a> {
                                         } else {
                                             source.len()
                                         }
-                                    } - pattern.len()],
+                                    } - pattern.len() +1],
                                 ),
                             }),
                             last_char: '>',
@@ -399,7 +414,7 @@ fn extract_tag<'a>(
     if current.is_some() {
         // Found opening
         // Jump whitespaces
-        while current.is_some() && WHITESPACE_SYMBOLS.contains(&current.unwrap().1) {
+        while current.is_some() && WHITESPACE_SYMBOLS.contains(&current.unwrap().1) && !at_opening {
             current = iter.next();
         }
 
@@ -415,7 +430,7 @@ fn extract_tag<'a>(
     }
 
     // Find end of name
-    while current.is_some() && (current.unwrap().1.is_alphanumeric() || current.unwrap().1 == '/') {
+    while current.is_some() && (VALID_TAG_CHARS.contains(&current.unwrap().1) || current.unwrap().1 == '/') {
         current = iter.next();
     }
     name_end = match current {
@@ -499,7 +514,7 @@ mod tests {
     fn test_extract_tag() {
         let source_one: &str = "img>";
         let source_two: &str = "p></p>";
-        
+
         let mut iter_one = source_one.char_indices();
         let mut iter_two = source_two.char_indices();
         iter_one.next();
@@ -507,10 +522,10 @@ mod tests {
 
         let result_one = extract_tag(source_one, &mut iter_one, true);
         let result_two = extract_tag(source_two, &mut iter_two, true);
-        
+
         assert!(result_one.is_ok());
         assert!(result_two.is_ok());
-        
+
         assert_eq!(result_one.unwrap().tag, "img");
         assert_eq!(result_two.unwrap().tag, "p");
     }
@@ -683,9 +698,16 @@ mod tests {
     }
 
     #[test]
-    fn test_large() {
-        let text = fs::read_to_string("res/test/simple_html.txt").expect("Couldn't read file");
+    fn test_parse_simple_html() {
+        let text = fs::read_to_string("res/test/simple.html").expect("Couldn't read file");
 
-        let result = Element::from_string(&text);
+        Element::from_string(&text);
+    }
+
+    #[test]
+    fn test_parse_complex_html() {
+        let text = fs::read_to_string("res/test/complex.html").expect("Couldn't read file");
+
+        Element::from_string(&text);
     }
 }

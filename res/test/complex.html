@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interactive Profile Page</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+
+    header {
+      background-color: #0066cc;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    section, aside {
+      background-color: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      border-bottom: 2px solid #eee;
+      padding-bottom: 5px;
+    }
+
+    button {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #005bb5;
+    }
+
+    footer {
+      text-align: center;
+      padding: 10px;
+      background-color: #222;
+      color: #ccc;
+    }
+
+    @media (max-width: 768px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Rusty's Profile</h1>
+    <p>HTML Lover. Bad relationship with bugs.</p>
+  </header>
+
+  <main>
+    <aside>
+      <h2>Contact</h2>
+      <form id="contactForm">
+        <label>
+          Name:<br>
+          <input type="text" id="name" required>
+        </label><br><br>
+        <label>
+          Message:<br>
+          <textarea id="message" rows="4" required></textarea>
+        </label><br><br>
+        <button type="submit">Send Message</button>
+      </form>
+    </aside>
+
+    <section>
+      <h2>About Me</h2>
+      <p>Hello! I'm Rusty Scrap, and I think I'm awesome!</p>
+
+      <h2>Skills</h2>
+      <ul id="skillsList">
+        <li>HTML in UTF-8</li>
+      </ul>
+
+      <button onclick="addSkill()">Add 'TypeScript'</button>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2025 Rusty Scrap | Built with ❤, passion and a hate for JavaScript.
+  </footer>
+
+  <script>
+
+    // A string that looks like an HTML tag
+
+    // Add a new skill to the list
+    function addSkill() {
+      const skillsList = document.getElementById("skillsList");
+      const newSkill = document.createElement("li");
+      newSkill.textContent = "JavaScript";
+      skillsList.appendChild(newSkill);
+    }
+
+    // Handle form submission
+    document.getElementById("contactForm").addEventListener("submit", function(e) {
+      e.preventDefault(); // Prevent page reload
+
+      const name = document.getElementById("name").value.trim();
+      const message = document.getElementById("message").value.trim();
+
+      if (name && message) {
+        alert(`Thanks, ${name}! Rusty has received your message.\nUnfortunately, he's not really good at human interaction.`);
+        this.reset();
+      } else {
+        alert("Please fill out all fields.");
+      }
+    });
+  </script>
+
+  <!-- These are just for testing-->
+  <div>
+    <div class="inline-flex items-center justify-around">
+      <a data-ylk="elm:logo;itc:0;sec:ybar;slk:frontpage;subsec:logo;" href="https://rusty-loves-you.com/"
+         class="unimportant"
+         data-rapid_p="2" data-v9y="1">
+      </a>
+    </div>
+
+    <script async="" src="https://www.spyware.com/grab_userdata.js"></script>
+    <script>
+      window.BASE_PREFIX = "/developers/gitignore/".replace(/\/+$/, '');
+      window.GOOGLE_ANALYTICS_UID = "UA-21104039-1";</script>
+  </div>
+
+</body>
+</html>
