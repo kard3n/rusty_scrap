@@ -1,8 +1,9 @@
 static WHITESPACE_SYMBOLS: [char; 3] = [' ', '\t', '\n'];
-static SELF_CLOSING_TAGS: [&str; 13] = [
+static SELF_CLOSING_TAGS: [&str; 14] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
-    "wbr",
+    "wbr", "!DOCTYPE"
 ];
+static CHILDLESS_TAGS: [&str; 4] = ["script", "style", "textarea", "title"];
 
 #[derive(Debug)]
 pub enum TerminalValue<'a> {
@@ -30,6 +31,7 @@ enum IteratorResultElement<'a> {
 pub enum Child<'a> {
     None,                    // Does not have a child
     Nodes(Vec<Element<'a>>), // One or more children
+    Text(&'a str),           // Text content, like in <script>
 }
 
 #[derive(Debug)]
@@ -161,7 +163,56 @@ impl<'a> Element<'a> {
                 };
                 let mut child_nodes: Vec<Element<'a>> = Vec::new();
 
-                if !SELF_CLOSING_TAGS.contains(&name) {
+                if CHILDLESS_TAGS.contains(&name) {
+                    // Childless tag, only need to look for it's closing tag. Ignore everything until it was found
+
+                    current = iter.next(); // Jump > after name
+                    let start_pos: usize = current.unwrap().0;
+
+                    let mut pattern = String::with_capacity(name.len() + 3);
+                    pattern.push_str("</");
+                    pattern.push_str(&name);
+                    pattern.push_str(">");
+                    let mut pattern_iter = pattern.chars();
+                    let mut pattern_current = pattern_iter.next();
+
+                    while current.is_some() && pattern_current.is_some() {
+                        if current.unwrap().1 == pattern_current.unwrap() {
+                            pattern_current = pattern_iter.next();
+                        } else {
+                            // Reset
+                            pattern_iter = pattern.chars();
+                            pattern_current = pattern_iter.next();
+                        }
+                        current = iter.next();
+                    }
+
+                    if pattern_current.is_none() {
+                        // Pattern was exhausted: success
+                        return IteratorResultElement::Element {
+                            element: Element::Named(NamedElement {
+                                name,
+                                attributes,
+                                child: Child::Text(
+                                    &source[start_pos..{
+                                        if current.is_some() {
+                                            current.unwrap().0
+                                        } else {
+                                            source.len()
+                                        }
+                                    } - pattern.len()],
+                                ),
+                            }),
+                            last_char: '>',
+                        };
+                    } else {
+                        panic!(
+                            "Reached EOF searching end tag for tag {} at pos {}",
+                            name,
+                            start_pos - name.len() - 1
+                        );
+                    }
+                } else if !SELF_CLOSING_TAGS.contains(&name) {
                     // Not a self-cosing tag, therefore can have children
                     let mut next_child = Self::from_iterator(iter, source, false);
                     let mut last_char_lower_than;
@@ -364,7 +415,6 @@ fn extract_tag<'a>(
     }
 
     // Find end of name
-    current = iter.next();
     while current.is_some() && (current.unwrap().1.is_alphanumeric() || current.unwrap().1 == '/') {
         current = iter.next();
     }
@@ -387,7 +437,8 @@ fn extract_tag<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::html_element::{extract_attributes, Child, Element, TerminalValue};
+    use crate::html_element::{extract_attributes, extract_tag, Child, Element, TerminalValue};
+    use std::fs;
     use std::ops::Deref;
 
     #[test]
@@ -439,6 +490,40 @@ mod tests {
         match result {
             Element::Named(v) => {
                 assert_eq!(v.name, "div");
+            }
+            _ => panic!("Expected named element"),
+        }
+    }
+
+    #[test]
+    fn test_extract_tag() {
+        let source_one: &str = "img>";
+        let source_two: &str = "p></p>";
+        
+        let mut iter_one = source_one.char_indices();
+        let mut iter_two = source_two.char_indices();
+        iter_one.next();
+        iter_two.next();
+
+        let result_one = extract_tag(source_one, &mut iter_one, true);
+        let result_two = extract_tag(source_two, &mut iter_two, true);
+        
+        assert!(result_one.is_ok());
+        assert!(result_two.is_ok());
+        
+        assert_eq!(result_one.unwrap().tag, "img");
+        assert_eq!(result_two.unwrap().tag, "p");
+    }
+
+    #[test]
+    fn test_tag_single_letter() {
+        let source: &str = "<p></p>";
+
+        let result = Element::from_string(&source);
+
+        match result {
+            Element::Named(v) => {
+                assert_eq!(v.name, "p");
             }
             _ => panic!("Expected named element"),
         }
@@ -532,30 +617,30 @@ mod tests {
     }
 
     #[test]
-    fn test_ignore_escaped_opening(){
+    fn test_ignore_escaped_opening() {
         let source_one: &str = "<div>To end a div, use \\</t>!</div>";
         let source_two: &str = "<div>\\</t></div>";
-        
+
         let expected_inner_one = "To end a div, use \\</t>!";
         let expected_inner_two = "\\</t>";
-        
+
         let result_one = Element::from_string(&source_one);
         let result_two = Element::from_string(&source_two);
-        
-        compare_inner_text_element(result_one, expected_inner_one);
-        compare_inner_text_element(result_two, expected_inner_two);
+
+        compare_inner_text_element(result_one, expected_inner_one, "div");
+        compare_inner_text_element(result_two, expected_inner_two, "div");
     }
-    
-    fn compare_inner_text_element(result: Element, expected: &str) {
+
+    fn compare_inner_text_element(result: Element, expected_inner: &str, expected_name: &str) {
         match result {
             Element::Named(n) => {
-                assert_eq!(n.name, "div");
+                assert_eq!(n.name, expected_name);
                 match n.child {
                     Child::Nodes(children) => {
                         assert_eq!(children.len(), 1);
                         match &children[0] {
                             Element::Text(t) => {
-                                assert_eq!(t.deref(), expected);
+                                assert_eq!(t.deref(), expected_inner);
                             }
                             _ => {
                                 panic!("Unexpected named child");
@@ -571,5 +656,36 @@ mod tests {
                 panic!("{:?}", result)
             }
         }
+    }
+
+    #[test]
+    fn test_childless_element() {
+        let source_one: &str = "<script>This script \\<\t> \\<t> contains a lot</script>";
+        let expected = "This script \\<\t> \\<t> contains a lot";
+        let result = Element::from_string(&source_one);
+
+        match result {
+            Element::Named(n) => {
+                assert_eq!(n.name, "script");
+                match n.child {
+                    Child::Text(content) => {
+                        assert_eq!(content.deref(), expected);
+                    }
+                    _ => {
+                        panic! {"Expected nodes, got None"}
+                    }
+                }
+            }
+            _ => {
+                panic!("{:?}", result)
+            }
+        }
+    }
+
+    #[test]
+    fn test_large() {
+        let text = fs::read_to_string("res/test/simple_html.txt").expect("Couldn't read file");
+
+        let result = Element::from_string(&text);
     }
 }
