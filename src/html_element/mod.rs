@@ -2,12 +2,10 @@ mod test;
 
 const WHITESPACE_SYMBOLS: [char; 3] = [' ', '\t', '\n'];
 const VALID_TAG_CHARS: [char; 64] = [
-    'A','B','C','D','E','F','G','H','I','J','K','L','M',
-    'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-    'a','b','c','d','e','f','g','h','i','j','k','l','m',
-    'n','o','p','q','r','s','t','u','v','w','x','y','z',
-    '0','1','2','3','4','5','6','7','8','9',
-    '-', '.'
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
+    '5', '6', '7', '8', '9', '-', '.',
 ];
 const SELF_CLOSING_TAGS: [&str; 13] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
@@ -26,6 +24,7 @@ pub enum TerminalValue<'a> {
 pub enum Element<'a> {
     Named(NamedElement<'a>),
     Text(&'a str),
+    Comment(&'a str),
     Root(Vec<Element<'a>>),
 }
 
@@ -56,6 +55,11 @@ struct TagExtractionResult<'a> {
     last_char_higher_than: bool,
 }
 
+struct PatternSearchResult {
+    search_start_pos: usize,
+    result: Option<(usize, char)>,
+}
+
 #[derive(Debug)]
 pub struct NamedElement<'a> {
     pub name: &'a str,
@@ -73,15 +77,6 @@ impl<'a> NamedElement<'a> {
     }
 }
 
-impl<'a> TagExtractionResult<'a> {
-    fn new(tag: &'a str, last_char_higher_than: bool) -> Self {
-        Self {
-            tag,
-            last_char_higher_than,
-        }
-    }
-}
-
 impl<'a> Element<'a> {
     pub fn from_string(source: &'a str) -> Self {
         let mut iter = source.char_indices();
@@ -91,7 +86,7 @@ impl<'a> Element<'a> {
         let mut last_char_lower_than = false;
         let mut stop: bool = false;
 
-        while !stop{
+        while !stop {
             current_result = Self::from_iterator(&mut iter, &source, last_char_lower_than);
             match current_result {
                 IteratorResultElement::Element { element, last_char } => {
@@ -104,8 +99,6 @@ impl<'a> Element<'a> {
                 IteratorResultElement::End => {
                     stop = true;
                 }
-
-
             }
         }
 
@@ -176,11 +169,39 @@ impl<'a> Element<'a> {
                     }
                 };
 
+                // Special case: comment
+                // Don't need to read attributes, but look for special closing -->
+                if name.starts_with("!--") {
+                    // Comment
+                    let search_result = find_pattern(iter, "-->");
+
+                    match search_result {
+                        Result::Ok(result) => {
+                            return IteratorResultElement::Element {
+                                element: Element::Comment(
+                                    &source[element_start + name.len()
+                                        ..if result.result.is_some() {
+                                            result.result.unwrap().0 - 2
+                                        } else {
+                                            source.len()
+                                        }],
+                                ),
+                                last_char: '>',
+                            };
+                        }
+                        Result::Err(c) => {
+                            panic!("{}", c);
+                        }
+                    }
+                }
+
                 let attributes: Vec<Attribute<'a>> = match &tag_extraction_result {
                     Ok(v) => {
                         if v.last_char_higher_than {
+                            println!("1");
                             Vec::new()
                         } else {
+                            println!("2");
                             extract_attributes(&source, iter)
                         }
                     }
@@ -191,60 +212,51 @@ impl<'a> Element<'a> {
                 let mut child_nodes: Vec<Element<'a>> = Vec::new();
 
                 if name.starts_with('!') {
+                    // Doctype
                     return IteratorResultElement::Element {
                         element: Element::Named(NamedElement::new(name, attributes, Child::None)),
                         last_char: '_',
                     };
                 } else if CHILDLESS_TAGS.contains(&name) {
-                    // Childless tag, only need to look for it's closing tag. Ignore everything until it was found
+                    // Childless tag, only need to look for it's closing tag. Ignore everything until it is found
 
-                    current = iter.next(); // Jump > after name
+                    //current = iter.next(); // Jump > after name
                     let start_pos: usize = current.unwrap().0;
 
                     let mut pattern = String::with_capacity(name.len() + 3);
                     pattern.push_str("</");
                     pattern.push_str(&name);
                     pattern.push_str(">");
-                    let mut pattern_iter = pattern.chars();
-                    let mut pattern_current = pattern_iter.next();
 
-                    while current.is_some() && pattern_current.is_some() {
-                        if current.unwrap().1 == pattern_current.unwrap() {
-                            pattern_current = pattern_iter.next();
-                        } else {
-                            // Reset
-                            pattern_iter = pattern.chars();
-                            pattern_current = pattern_iter.next();
-                        }
-                        if pattern_current.is_some() { // Only go to next if we aren't at the end
-                            current = iter.next();
-                        }
-                    }
+                    let search_result = find_pattern(iter, &pattern);
 
-                    if pattern_current.is_none() {
-                        // Pattern was exhausted: success
-                        return IteratorResultElement::Element {
-                            element: Element::Named(NamedElement {
+                    match search_result {
+                        Ok(v) => {
+                            return IteratorResultElement::Element {
+                                element: Element::Named(NamedElement {
+                                    name,
+                                    attributes,
+                                    child: Child::Text(
+                                        &source[v.search_start_pos..{
+                                            if v.result.is_some() {
+                                                v.result.unwrap().0
+                                            } else {
+                                                source.len()
+                                            }
+                                        } - pattern.len()
+                                            + 1],
+                                    ),
+                                }),
+                                last_char: '>',
+                            };
+                        }
+                        Err(c) => {
+                            panic!(
+                                "Reached EOF searching end tag for tag {} at pos {}",
                                 name,
-                                attributes,
-                                child: Child::Text(
-                                    &source[start_pos..{
-                                        if current.is_some() {
-                                            current.unwrap().0
-                                        } else {
-                                            source.len()
-                                        }
-                                    } - pattern.len() +1],
-                                ),
-                            }),
-                            last_char: '>',
-                        };
-                    } else {
-                        panic!(
-                            "Reached EOF searching end tag for tag {} at pos {}",
-                            name,
-                            start_pos - name.len() - 1
-                        );
+                                start_pos - name.len() - 1
+                            );
+                        }
                     }
                 } else if !SELF_CLOSING_TAGS.contains(&name) {
                     // Not a self-cosing tag, therefore can have children
@@ -396,6 +408,11 @@ fn extract_attributes<'a>(
         previous_was_escape = false;
         current = iter.next();
     }
+
+    if current.is_none() {
+        panic!("Reached EOF while looking for attributes.")
+    }
+
     // Add last attribute
     if !before_value_start && !in_string {
         attributes.push(Attribute::from_string(
@@ -404,6 +421,47 @@ fn extract_attributes<'a>(
     }
 
     attributes
+}
+
+/// Searches for the given pattern using the iterator
+/// # Arguments
+/// * `iter` The iterator to use for searching. The following .next is the start point of the search
+/// * `pattern` The pattern to search for
+/// # Returns
+/// On Success: A Result:Ok containing a PatternSearchResult
+/// On failure: A string indicating what went wrong
+fn find_pattern<'a>(
+    iter: &mut impl Iterator<Item = (usize, char)>,
+    pattern: &str,
+) -> Result<PatternSearchResult, &'a str> {
+    let mut pattern_iter = pattern.chars();
+    let mut pattern_current = pattern_iter.next();
+    let mut current = iter.next();
+    let search_start_iter = current;
+
+    while current.is_some() && pattern_current.is_some() {
+        if current.unwrap().1 == pattern_current.unwrap() {
+            pattern_current = pattern_iter.next();
+        } else {
+            // Reset
+            pattern_iter = pattern.chars();
+            pattern_current = pattern_iter.next();
+        }
+        if pattern_current.is_some() {
+            // Only go to next if we aren't at the end
+            current = iter.next();
+        }
+    }
+
+    if pattern_current.is_none() {
+        // Pattern was exhausted: success
+        return Result::Ok(PatternSearchResult {
+            search_start_pos: search_start_iter.unwrap().0,
+            result: current,
+        });
+    } else {
+        return Result::Err("Reached EOF searching for end tag pattern.");
+    }
 }
 
 /// Returns a string slice containing only the tag
@@ -449,7 +507,9 @@ fn extract_tag<'a>(
     }
 
     // Find end of name
-    while current.is_some() && (VALID_TAG_CHARS.contains(&current.unwrap().1) || current.unwrap().1 == '/') {
+    while current.is_some()
+        && (VALID_TAG_CHARS.contains(&current.unwrap().1) || current.unwrap().1 == '/')
+    {
         current = iter.next();
     }
     name_end = match current {
@@ -459,12 +519,12 @@ fn extract_tag<'a>(
         Some(v) => v.0,
     };
 
-    return Result::Ok(TagExtractionResult::new(
-        &source[if at_opening {
+    return Result::Ok(TagExtractionResult {
+        tag: &source[if at_opening {
             name_start - 1
         } else {
             name_start
         }..name_end],
-        current.is_some() && current.unwrap().1 == '>',
-    ));
+        last_char_higher_than: current.is_some() && current.unwrap().1 == '>',
+    });
 }

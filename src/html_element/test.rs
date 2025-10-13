@@ -256,6 +256,43 @@ mod tests {
     }
 
     #[test]
+    fn test_comment() {
+        let source_one: &str = "<div><!-- This is a simple comment --></div>";
+        let expected = " This is a simple comment ";
+        let result = Element::from_string(&source_one);
+
+        match &result {
+            Element::Root(elems) => {
+                match &elems[0] {
+                    Element::Named(n) => {
+                        assert_eq!(n.name, "div");
+                        match &n.child {
+                            Child::Nodes(nodes) => {
+                                match &nodes[0] {
+                                    Element::Comment(comment) => {
+                                        assert_eq!(comment.deref(), expected);
+                                    }
+                                    _ => {
+                                        panic!("Expected a comment, got else.");
+                                    }
+                                }
+                                
+                            }
+                            _ => {
+                                panic! {"Expected nodes, got None"}
+                            }
+                        }
+                    }
+                    _ => {
+                        panic!("{:?}", result)
+                    }
+                }
+            }
+            _ => panic!("Expected root element!"),
+        }
+    }
+    
+    #[test]
     fn test_childless_element() {
         let source_one: &str = "<script>This script \\<\t> \\<t> contains a lot</script>";
         let expected = "This script \\<\t> \\<t> contains a lot";
