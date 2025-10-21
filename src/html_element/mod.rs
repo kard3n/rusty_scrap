@@ -1,17 +1,6 @@
 mod test;
 
-const WHITESPACE_SYMBOLS: [char; 3] = [' ', '\t', '\n'];
-const VALID_TAG_CHARS: [char; 64] = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
-    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
-    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9', '-', '.',
-];
-const SELF_CLOSING_TAGS: [&str; 13] = [
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
-    "wbr",
-];
-const CHILDLESS_TAGS: [&str; 4] = ["script", "style", "textarea", "title"];
+use crate::constants::*;
 
 #[derive(Debug)]
 pub enum TerminalValue<'a> {
