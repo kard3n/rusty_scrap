@@ -1,9 +1,9 @@
 pub const WHITESPACE_SYMBOLS: [char; 3] = [' ', '\t', '\n'];
-pub const VALID_TAG_CHARS: [char; 64] = [
+pub const VALID_TAG_CHARS: [char; 65] = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
     'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
     'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9', '-', '.',
+    '5', '6', '7', '8', '9', '-', '.', '!'
 ];
 pub const SELF_CLOSING_TAGS: [&str; 13] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",

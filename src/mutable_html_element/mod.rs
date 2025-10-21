@@ -1,5 +1,5 @@
 mod test;
-mod parser;
+pub mod parser;
 
 #[derive(Debug)]
 pub enum TerminalValue<'a> {

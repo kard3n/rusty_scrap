@@ -118,42 +118,64 @@ impl<'a> MutableElement<'a> {
                 },
             }
         } else {
+            // Named element
             let element_start: usize = current.unwrap().0;
-            let tag_extraction_result = extract_tag(&source, iter);
-            let name: &str = match &tag_extraction_result {
-                Ok(v) => v.tag,
+            // Extract the tag. If the last char read by the previous invocation is a '<', we add the first character we read here
+            let tag_extraction_result_wrapped =
+                extract_tag(&source, iter, if !last_char_lower_than { 0 } else { 1 });
+            match &tag_extraction_result_wrapped {
                 Err(c) => {
                     panic!("{}", c);
                 }
+                _ => {}
             };
 
-            /*
-            // Named element
-            // First is a <, go to next
-            if !last_char_lower_than {
-                current = iter.next();
-            }
-             */
+            println!(
+                "Starting tag extraction with: {}. Current char: {}",
+                &source[element_start..],
+                current.unwrap().1
+            );
 
-            if name.starts_with("/") {
+            let tag_extraction_result = tag_extraction_result_wrapped.unwrap();
+
+            println!(
+                "Found tag: '{}' with length {}",
+                tag_extraction_result.tag,
+                tag_extraction_result.tag.len()
+            );
+
+            if tag_extraction_result.tag.starts_with("/") {
                 // Closing tag of normal element
 
-                return IteratorResultElement::ClosingTag {
-                    name: &source[current.unwrap().0..{
-                        while current.unwrap().1 != '>' {
-                            // Go to closing symbol
-                            current = iter.next()
-                        }
-                        current.unwrap().0
-                    }],
-                    last_pos: current.unwrap().0,
-                };
+                if tag_extraction_result.last_char_higher_than {
+                    return IteratorResultElement::ClosingTag {
+                        name: tag_extraction_result.tag,
+                        last_pos: tag_extraction_result.search_end,
+                    };
+                } else {
+                    return IteratorResultElement::ClosingTag {
+                        name: &source[current.unwrap().0..{
+                            while current.is_some() && current.unwrap().1 != '>' {
+                                // Go to closing symbol
+                                current = iter.next();
+                            }
+
+                            if current.is_none() {
+                                panic!("Encountered EOF while reading closing tag.");
+                            }
+
+                            current.unwrap().0
+                        }],
+                        last_pos: current.unwrap().0,
+                    };
+                }
             } else {
                 // Opening tag of an element
 
                 // Special case: comment
                 // Don't need to read attributes, but look for special closing -->
-                if name.starts_with("!--") {
+                if tag_extraction_result.tag == "!--" {
+                    println!("Start of comment");
                     // Comment
                     let search_result = find_pattern(iter, "-->");
 
@@ -161,7 +183,10 @@ impl<'a> MutableElement<'a> {
                         Result::Ok(result) => {
                             return IteratorResultElement::Element {
                                 element: MutableElement::Comment(MutableCommentElement {
-                                    text: &source[element_start + name.len()
+                                    // +1 at start to compensate for < symbol
+                                    text: &source[element_start
+                                        + tag_extraction_result.tag.len()
+                                        + if last_char_lower_than { 0 } else { 1 }
                                         ..if result.result.is_some() {
                                             result.result.unwrap().0 - 2
                                         } else {
@@ -190,45 +215,39 @@ impl<'a> MutableElement<'a> {
                     }
                 }
 
-                let attributes = match &tag_extraction_result {
-                    Ok(v) => {
-                        if v.last_char_higher_than {
-                            AttributeExtractionResult {
-                                attributes: Vec::new(),
-                                search_start: v.search_start,
-                                //tag extraction ended with closing symbol, so attribute search would have ended there too
-                                search_end: v.search_end,
-                            }
-                        } else {
-                            extract_attributes(&source, iter)
-                        }
+                let attributes = if tag_extraction_result.last_char_higher_than {
+                    AttributeExtractionResult {
+                        attributes: Vec::new(),
+                        search_start: tag_extraction_result.search_start,
+                        //tag extraction ended with closing symbol, so attribute search would have ended there too
+                        search_end: tag_extraction_result.search_end,
                     }
-                    Err(c) => {
-                        panic!("{}", c);
-                    }
+                } else {
+                    extract_attributes(&source, iter)
                 };
+
                 let mut child_nodes: Vec<MutableElement<'a>> = Vec::new();
 
-                if name.starts_with('!') {
+                if tag_extraction_result.tag.starts_with('!') {
                     // Doctype
                     return IteratorResultElement::Element {
                         element: MutableElement::Named(MutableNamedElement {
-                            name,
+                            name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: Child::None,
                         }),
                         last_char: '_',
                         last_pos: attributes.search_end,
                     };
-                } else if CHILDLESS_TAGS.contains(&name) {
+                } else if CHILDLESS_TAGS.contains(&tag_extraction_result.tag) {
                     // Childless tag, only need to look for it's closing tag. Ignore everything until it is found
 
                     //current = iter.next(); // Jump > after name
                     let start_pos: usize = current.unwrap().0;
 
-                    let mut pattern = String::with_capacity(name.len() + 3);
+                    let mut pattern = String::with_capacity(tag_extraction_result.tag.len() + 3);
                     pattern.push_str("</");
-                    pattern.push_str(&name);
+                    pattern.push_str(&tag_extraction_result.tag);
                     pattern.push_str(">");
 
                     let search_result = find_pattern(iter, &pattern);
@@ -237,7 +256,7 @@ impl<'a> MutableElement<'a> {
                         Ok(search_result_ok) => {
                             return IteratorResultElement::Element {
                                 element: MutableElement::Named(MutableNamedElement {
-                                    name,
+                                    name: tag_extraction_result.tag,
                                     attributes: attributes.attributes,
                                     child: Child::Text(
                                         &source[search_result_ok.search_start..{
@@ -257,16 +276,16 @@ impl<'a> MutableElement<'a> {
                         Err(c) => {
                             panic!(
                                 "Reached EOF searching end tag for tag {} at pos {}",
-                                name,
-                                start_pos - name.len() - 1
+                                tag_extraction_result.tag,
+                                start_pos - tag_extraction_result.tag.len() - 1
                             );
                         }
                     }
-                } else if SELF_CLOSING_TAGS.contains(&name) {
+                } else if SELF_CLOSING_TAGS.contains(&tag_extraction_result.tag) {
                     // Self closing tag
                     return IteratorResultElement::Element {
                         element: MutableElement::Named(MutableNamedElement {
-                            name,
+                            name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: if !child_nodes.is_empty() {
                                 Child::Nodes(child_nodes)
@@ -303,18 +322,16 @@ impl<'a> MutableElement<'a> {
                     // Check that the element was closed properly
                     match next_child {
                         IteratorResultElement::ClosingTag { name, last_pos } => {
-                            if name != &name[1..] {
+                            if tag_extraction_result.tag != &name[1..] {
                                 panic!(
                                     "Name of the closing tag ('{}') does not match name of the opening tag ('{}') at {}.",
-                                    &name,
-                                    name,
-                                    element_start - 1
+                                    &name, tag_extraction_result.tag, element_start
                                 )
                             };
 
                             return IteratorResultElement::Element {
                                 element: MutableElement::Named(MutableNamedElement {
-                                    name,
+                                    name: tag_extraction_result.tag,
                                     attributes: attributes.attributes,
                                     child: if !child_nodes.is_empty() {
                                         Child::Nodes(child_nodes)
@@ -329,7 +346,7 @@ impl<'a> MutableElement<'a> {
                         _ => {
                             panic!(
                                 "Element '{}' at position {} did not have a closing tag!",
-                                name, element_start
+                                tag_extraction_result.tag, element_start
                             );
                         }
                     };
@@ -483,7 +500,7 @@ fn find_pattern<'a>(
         }
         if pattern_current.is_some() {
             // Only go to next if we aren't at the end
-            previous_current = iter.next();
+            previous_current = current;
             current = iter.next();
         }
     }
@@ -516,6 +533,7 @@ fn find_pattern<'a>(
 fn extract_tag<'a>(
     source: &'a str,
     iter: &mut impl Iterator<Item = (usize, char)>,
+    beginning_additional_char: usize, // How many characters from before the beginning should be added
 ) -> Result<TagExtractionResult<'a>, &'a str> {
     let name_start: usize;
     let name_end: usize;
@@ -549,7 +567,7 @@ fn extract_tag<'a>(
     };
 
     return Result::Ok(TagExtractionResult {
-        tag: &source[name_start..name_end],
+        tag: &source[name_start - beginning_additional_char..name_end],
         search_start,
         search_end: current.unwrap().0,
         last_char_higher_than: current.is_some() && current.unwrap().1 == '>',
