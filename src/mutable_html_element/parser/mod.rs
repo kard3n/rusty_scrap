@@ -1,5 +1,8 @@
-use crate::mutable_html_element::{Attribute, Child, ModificationType, MutableCommentElement, MutableElement, MutableNamedElement, MutableTextElement, TerminalValue};
-use crate::constants::{*};
+use crate::constants::*;
+use crate::mutable_html_element::{
+    Attribute, Child, ModificationType, MutableCommentElement, MutableElement, MutableNamedElement,
+    MutableTextElement, TerminalValue,
+};
 struct TagExtractionResult<'a> {
     tag: &'a str,
     search_start: usize,
@@ -31,7 +34,6 @@ enum IteratorResultElement<'a> {
     },
     End,
 }
-
 
 impl<'a> MutableElement<'a> {
     pub fn from_string(source: &'a str) -> Self {
@@ -117,7 +119,7 @@ impl<'a> MutableElement<'a> {
             }
         } else {
             let element_start: usize = current.unwrap().0;
-            let tag_extraction_result = extract_tag(&source, iter, true);
+            let tag_extraction_result = extract_tag(&source, iter);
             let name: &str = match &tag_extraction_result {
                 Ok(v) => v.tag,
                 Err(c) => {
@@ -161,10 +163,10 @@ impl<'a> MutableElement<'a> {
                                 element: MutableElement::Comment(MutableCommentElement {
                                     text: &source[element_start + name.len()
                                         ..if result.result.is_some() {
-                                        result.result.unwrap().0 - 2
-                                    } else {
-                                        source.len()
-                                    }],
+                                            result.result.unwrap().0 - 2
+                                        } else {
+                                            source.len()
+                                        }],
                                     start: element_start,
                                     end: if result.result.is_some() {
                                         result.result.unwrap().0
@@ -210,11 +212,11 @@ impl<'a> MutableElement<'a> {
                 if name.starts_with('!') {
                     // Doctype
                     return IteratorResultElement::Element {
-                        element: MutableElement::Named(MutableNamedElement{
+                        element: MutableElement::Named(MutableNamedElement {
                             name,
                             attributes: attributes.attributes,
                             child: Child::None,
-                    }),
+                        }),
                         last_char: '_',
                         last_pos: attributes.search_end,
                     };
@@ -327,8 +329,7 @@ impl<'a> MutableElement<'a> {
                         _ => {
                             panic!(
                                 "Element '{}' at position {} did not have a closing tag!",
-                                name,
-                                element_start - 1
+                                name, element_start
                             );
                         }
                     };
@@ -515,27 +516,14 @@ fn find_pattern<'a>(
 fn extract_tag<'a>(
     source: &'a str,
     iter: &mut impl Iterator<Item = (usize, char)>,
-    at_opening: bool,
 ) -> Result<TagExtractionResult<'a>, &'a str> {
     let name_start: usize;
     let name_end: usize;
     let mut current: Option<(usize, char)> = iter.next();
     let search_start = current.unwrap().0;
     // Find start of name
-    // Find opening symbol
-    if !at_opening {
-        while current.is_some() && current.unwrap().1 != '<' {
-            current = iter.next();
-        }
-    }
 
     if current.is_some() {
-        // Found opening
-        // Jump whitespaces
-        while current.is_some() && WHITESPACE_SYMBOLS.contains(&current.unwrap().1) && !at_opening {
-            current = iter.next();
-        }
-
         // Set start to index if available
         name_start = match current {
             None => {
@@ -561,13 +549,12 @@ fn extract_tag<'a>(
     };
 
     return Result::Ok(TagExtractionResult {
-        tag: &source[if at_opening {
-            name_start - 1
-        } else {
-            name_start
-        }..name_end],
+        tag: &source[name_start..name_end],
         search_start,
         search_end: current.unwrap().0,
         last_char_higher_than: current.is_some() && current.unwrap().1 == '>',
     });
 }
+
+#[cfg(test)]
+mod test;
