@@ -198,10 +198,8 @@ impl<'a> Element<'a> {
                 let attributes: Vec<Attribute<'a>> = match &tag_extraction_result {
                     Ok(v) => {
                         if v.last_char_higher_than {
-                            println!("1");
                             Vec::new()
                         } else {
-                            println!("2");
                             extract_attributes(&source, iter)
                         }
                     }
