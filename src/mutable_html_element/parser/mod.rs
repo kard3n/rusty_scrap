@@ -130,19 +130,7 @@ impl<'a> MutableElement<'a> {
                 _ => {}
             };
 
-            println!(
-                "Starting tag extraction with: {}. Current char: {}",
-                &source[element_start..],
-                current.unwrap().1
-            );
-
             let tag_extraction_result = tag_extraction_result_wrapped.unwrap();
-
-            println!(
-                "Found tag: '{}' with length {}",
-                tag_extraction_result.tag,
-                tag_extraction_result.tag.len()
-            );
 
             if tag_extraction_result.tag.starts_with("/") {
                 // Closing tag of normal element
@@ -175,7 +163,6 @@ impl<'a> MutableElement<'a> {
                 // Special case: comment
                 // Don't need to read attributes, but look for special closing -->
                 if tag_extraction_result.tag == "!--" {
-                    println!("Start of comment");
                     // Comment
                     let search_result = find_pattern(iter, "-->");
 
