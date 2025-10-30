@@ -1,5 +1,5 @@
-mod test;
 pub mod parser;
+mod test;
 
 #[derive(Debug)]
 pub enum TerminalValue<'a> {
@@ -26,6 +26,8 @@ pub struct MutableNamedElement<'a> {
     pub name: &'a str,
     pub attributes: Vec<Attribute<'a>>,
     pub child: Child<'a>,
+    start: usize,
+    end: usize,
 }
 
 pub struct MutableTextElement<'a> {
@@ -54,6 +56,7 @@ pub enum Child<'a> {
     Text(&'a str),                  // Text content, like in <script>
 }
 
+// TODO: add stand and end
 pub struct Attribute<'a> {
     pub name: &'a str,
     pub value: TerminalValue<'a>,

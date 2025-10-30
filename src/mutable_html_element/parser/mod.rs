@@ -235,6 +235,8 @@ impl<'a> MutableElement<'a> {
                             name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: Child::None,
+                            start: tag_extraction_result.search_start,
+                            end: attributes.search_end,
                         }),
                         last_char: '_',
                         last_pos: attributes.search_end,
@@ -268,6 +270,8 @@ impl<'a> MutableElement<'a> {
                                         } - pattern.len()
                                             + 1],
                                     ),
+                                    start: tag_extraction_result.search_start,
+                                    end: search_result_ok.search_end,
                                 }),
                                 last_char: '>',
                                 last_pos: search_result_ok.search_end,
@@ -287,11 +291,9 @@ impl<'a> MutableElement<'a> {
                         element: MutableElement::Named(MutableNamedElement {
                             name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
-                            child: if !child_nodes.is_empty() {
-                                Child::Nodes(child_nodes)
-                            } else {
-                                Child::None
-                            },
+                            child: Child::Nodes(child_nodes),
+                            start: tag_extraction_result.search_start,
+                            end: attributes.search_end,
                         }),
                         last_char: '_',
                         last_pos: attributes.search_end,
@@ -338,6 +340,8 @@ impl<'a> MutableElement<'a> {
                                     } else {
                                         Child::None
                                     },
+                                    start: tag_extraction_result.search_start,
+                                    end: last_pos,
                                 }),
                                 last_char: '_',
                                 last_pos,
@@ -357,29 +361,26 @@ impl<'a> MutableElement<'a> {
 }
 
 impl<'a> Attribute<'a> {
-    fn new(name: &'a str, value: TerminalValue<'a>) -> Attribute<'a> {
-        Attribute { name, value }
-    }
-
+    // TODO: make this single pass by integrating it into extract_attributes
     fn from_string(source: &'a str) -> Self {
         let first_equals_sign: usize = source.find('=').unwrap();
         let value = &source[first_equals_sign + 1..].trim_start().trim_end();
 
         return if value.starts_with('"') {
-            Attribute::new(
-                &source[..first_equals_sign].trim_end(),
-                TerminalValue::Str(&value[1..value.len() - 1]),
-            )
+            Attribute {
+                name: &source[..first_equals_sign].trim_end(),
+                value: TerminalValue::Str(&value[1..value.len() - 1]),
+            }
         } else if value.contains('.') {
-            Attribute::new(
-                &source[..first_equals_sign].trim_end(),
-                TerminalValue::Float(value.parse::<f32>().unwrap()),
-            )
+            Attribute {
+                name: &source[..first_equals_sign].trim_end(),
+                value: TerminalValue::Float(value.parse::<f32>().unwrap()),
+            }
         } else {
-            Attribute::new(
-                &source[..first_equals_sign].trim_end(),
-                TerminalValue::Int(value.parse::<i32>().unwrap()),
-            )
+            Attribute {
+                name: &source[..first_equals_sign].trim_end(),
+                value: TerminalValue::Int(value.parse::<i32>().unwrap()),
+            }
         };
     }
 }
