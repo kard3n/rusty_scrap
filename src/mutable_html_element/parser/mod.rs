@@ -527,8 +527,7 @@ fn find_pattern<'a>(
 /// Returns a string slice containing only the tag
 /// # Arguments
 /// * `source` The beginning of an HTML element. Must have a `<` followed by a name. If a closing tag, the `/` will be included in the result
-/// * `iter` mutable reference to an iterator. Current position must be set to before the start of the element (`<`)
-/// * `at_opening` whether the iterator as already at the first letter of the name. If set to false, will advance to first '<'
+/// * `iter` mutable reference to an iterator. Current position must be set to the opening symbol of the element (`<`)
 /// # Returns
 /// A `Result::Ok` containing the tag if successful. Otherwise,a `Result::Err` containing an error code
 fn extract_tag<'a>(
@@ -569,7 +568,7 @@ fn extract_tag<'a>(
 
     return Result::Ok(TagExtractionResult {
         tag: &source[name_start - beginning_additional_char..name_end],
-        search_start,
+        search_start: search_start -1, // compensates for starting at the second symbol
         search_end: current.unwrap().0,
         last_char_higher_than: current.is_some() && current.unwrap().1 == '>',
     });
