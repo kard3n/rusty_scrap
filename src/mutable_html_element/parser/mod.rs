@@ -97,7 +97,7 @@ impl<'a> MutableElement<'a> {
                     element: MutableElement::Text(MutableTextElement {
                         text: &source[start_pos..],
                         start: start_pos,
-                        end: source.len(),
+                        end: source.len() -1,
                         modification: ModificationType::NONE,
                         new_text: String::new(),
                     }),
@@ -109,7 +109,7 @@ impl<'a> MutableElement<'a> {
                     element: MutableElement::Text(MutableTextElement {
                         text: &source[start_pos..v.0],
                         start: start_pos,
-                        end: v.0,
+                        end: v.0 -1,
                         modification: ModificationType::NONE,
                         new_text: String::new(),
                     }),
