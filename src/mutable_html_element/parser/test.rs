@@ -15,6 +15,11 @@ mod tests {
         assert_eq!(result.attributes.len(), 2);
 
         assert!(result.attributes[0].name == "a");
+        
+        // Check search start and end are correct
+        assert_eq!(result.search_start, 0);
+        assert_eq!(result.search_end, 15);
+        
 
         match &result.attributes[0].value {
             TerminalValue::Int(s) => {
@@ -36,11 +41,14 @@ mod tests {
         let source: &str = "<img>";
 
         let result = MutableElement::from_string(&source);
+        
 
         match result {
             MutableElement::Root(elems) => match &elems[0] {
                 MutableElement::Named(e) => {
                     assert_eq!(e.name, "img");
+                    assert_eq!(e.start, 0);
+                    assert_eq!(e.end, 4);
                 }
                 _ => panic!("Closing tag not found"),
             },
@@ -67,22 +75,31 @@ mod tests {
 
     #[test]
     fn test_extract_tag() {
-        let source_one: &str = "img>";
-        let source_two: &str = "p></p>";
+        let source_one: &str = "<img>";
+        let source_two: &str = "<p></p>";
 
         let mut iter_one = source_one.char_indices();
         let mut iter_two = source_two.char_indices();
         iter_one.next();
         iter_two.next();
 
-        let result_one = extract_tag(source_one, &mut iter_one, 1);
-        let result_two = extract_tag(source_two, &mut iter_two, 1);
+        let result_one = extract_tag(source_one, &mut iter_one, 0);
+        let result_two = extract_tag(source_two, &mut iter_two, 0);
 
         assert!(result_one.is_ok());
         assert!(result_two.is_ok());
+        
+        let res_one_inner = result_one.unwrap();
+        let res_two_inner = result_two.unwrap();
+        
+        assert_eq!(res_one_inner.search_start, 0);
+        assert_eq!(res_one_inner.search_end, 4);
+        
+        assert_eq!(res_two_inner.search_start, 0);
+        assert_eq!(res_two_inner.search_end, 2);
 
-        assert_eq!(result_one.unwrap().tag, "img");
-        assert_eq!(result_two.unwrap().tag, "p");
+        assert_eq!(res_one_inner.tag, "img");
+        assert_eq!(res_two_inner.tag, "p");
     }
 
     #[test]
@@ -95,6 +112,8 @@ mod tests {
             MutableElement::Root(elems) => match &elems[0] {
                 MutableElement::Named(v) => {
                     assert_eq!(v.name, "p");
+                    assert_eq!(v.start, 0);
+                    assert_eq!(v.end, 6);
                 }
                 _ => panic!("Expected named element"),
             },
@@ -128,6 +147,9 @@ mod tests {
                     assert_eq!(v.attributes[0].name, "src");
                     assert_eq!(v.attributes[1].name, "n");
                     assert_eq!(v.attributes[2].name, "val");
+                    
+                    assert_eq!(v.start, 0);
+                    assert_eq!(v.end, 31);
 
                     match &v.attributes[0].value {
                         &TerminalValue::Str("test") => {}
@@ -167,6 +189,8 @@ mod tests {
             MutableElement::Root(elems) => match &elems[0] {
                 MutableElement::Named(v) => {
                     assert_eq!(v.name, "div");
+                    assert_eq!(v.start, 0);
+                    assert_eq!(v.end, 33);
 
                     match &v.attributes[0].value {
                         TerminalValue::Float(87.0) => {}
@@ -182,6 +206,8 @@ mod tests {
                             match &v[0] {
                                 MutableElement::Text(t) => {
                                     assert_eq!(t.deref().text, "Hello There!");
+                                    assert_eq!(t.start, 16);
+                                    assert_eq!(t.end, 27);
                                 }
                                 other => panic!("Expected text, got other"),
                             }
@@ -263,7 +289,9 @@ mod tests {
                     match &n.child {
                         Child::Nodes(nodes) => match &nodes[0] {
                             MutableElement::Comment(comment) => {
-                                assert_eq!(comment.deref().text, expected);
+                                assert_eq!(comment.text, expected);
+                                assert_eq!(comment.start, 5);
+                                assert_eq!(comment.end, 37);
                             }
                             _ => {
                                 panic!("Expected a comment, got else.");
@@ -294,7 +322,7 @@ mod tests {
                     assert_eq!(n.name, "script");
                     match n.child {
                         Child::Text(content) => {
-                            assert_eq!(content.deref(), expected);
+                            assert_eq!(content, expected);
                         }
                         _ => {
                             panic! {"Expected nodes, got None"}
