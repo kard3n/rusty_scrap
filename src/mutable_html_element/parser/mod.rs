@@ -1,7 +1,7 @@
 use crate::constants::*;
 use crate::mutable_html_element::{
     Attribute, Child, ModificationType, MutableCommentElement, MutableElement, MutableNamedElement,
-    MutableTextElement, TerminalValue,
+    MutableSelfClosingNamedElement, MutableTextElement, TerminalValue,
 };
 struct TagExtractionResult<'a> {
     tag: &'a str,
@@ -30,6 +30,7 @@ enum IteratorResultElement<'a> {
     },
     ClosingTag {
         name: &'a str,
+        starting_pos: usize,
         last_pos: usize,
     },
     End,
@@ -55,7 +56,7 @@ impl<'a> MutableElement<'a> {
                     result.push(element);
                     last_char_lower_than = last_char == '<';
                 }
-                IteratorResultElement::ClosingTag { name, last_pos } => {
+                IteratorResultElement::ClosingTag { name, last_pos, starting_pos } => {
                     panic!("Encountered closing tag as direct child of the root element");
                 }
                 IteratorResultElement::End => {
@@ -68,7 +69,7 @@ impl<'a> MutableElement<'a> {
     }
 
     fn from_iterator(
-        iter: &mut impl Iterator<Item = (usize, char)>,
+        iter: &mut impl Iterator<Item=(usize, char)>,
         source: &'a str,
         last_char_lower_than: bool,
     ) -> IteratorResultElement<'a> {
@@ -97,7 +98,7 @@ impl<'a> MutableElement<'a> {
                     element: MutableElement::Text(MutableTextElement {
                         text: &source[start_pos..],
                         start: start_pos,
-                        end: source.len() -1,
+                        end: source.len() - 1,
                         modification: ModificationType::NONE,
                         new_text: Option::None,
                     }),
@@ -109,7 +110,7 @@ impl<'a> MutableElement<'a> {
                     element: MutableElement::Text(MutableTextElement {
                         text: &source[start_pos..v.0],
                         start: start_pos,
-                        end: v.0 -1,
+                        end: v.0 - 1,
                         modification: ModificationType::NONE,
                         new_text: Option::None,
                     }),
@@ -139,6 +140,7 @@ impl<'a> MutableElement<'a> {
                     return IteratorResultElement::ClosingTag {
                         name: tag_extraction_result.tag,
                         last_pos: tag_extraction_result.search_end,
+                        starting_pos: element_start,
                     };
                 } else {
                     return IteratorResultElement::ClosingTag {
@@ -155,6 +157,7 @@ impl<'a> MutableElement<'a> {
                             current.unwrap().0
                         }],
                         last_pos: current.unwrap().0,
+                        starting_pos: element_start,
                     };
                 }
             } else {
@@ -175,10 +178,10 @@ impl<'a> MutableElement<'a> {
                                         + tag_extraction_result.tag.len()
                                         + if last_char_lower_than { 0 } else { 1 }
                                         ..if result.result.is_some() {
-                                            result.result.unwrap().0 - 2
-                                        } else {
-                                            source.len()
-                                        }],
+                                        result.result.unwrap().0 - 2
+                                    } else {
+                                        source.len()
+                                    }],
                                     start: element_start,
                                     end: if result.result.is_some() {
                                         result.result.unwrap().0
@@ -218,7 +221,7 @@ impl<'a> MutableElement<'a> {
                 if tag_extraction_result.tag.starts_with('!') {
                     // Doctype
                     return IteratorResultElement::Element {
-                        element: MutableElement::Named(MutableNamedElement {
+                        element: MutableElement::SelfClosing(MutableSelfClosingNamedElement {
                             name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: Child::None,
@@ -261,8 +264,10 @@ impl<'a> MutableElement<'a> {
                                     ),
                                     modification_type: ModificationType::NONE,
                                     new_name: Option::None,
-                                    start: tag_extraction_result.search_start,
-                                    end: search_result_ok.search_end,
+                                    opening_start: tag_extraction_result.search_start,
+                                    opening_end: attributes.search_end,
+                                    closing_start: search_result_ok.search_start,
+                                    closing_end: search_result_ok.search_end,
                                 }),
                                 last_char: '>',
                                 last_pos: search_result_ok.search_end,
@@ -279,7 +284,7 @@ impl<'a> MutableElement<'a> {
                 } else if SELF_CLOSING_TAGS.contains(&tag_extraction_result.tag) {
                     // Self closing tag
                     return IteratorResultElement::Element {
-                        element: MutableElement::Named(MutableNamedElement {
+                        element: MutableElement::SelfClosing(MutableSelfClosingNamedElement {
                             name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: Child::Nodes(child_nodes),
@@ -316,7 +321,7 @@ impl<'a> MutableElement<'a> {
 
                     // Check that the element was closed properly
                     match next_child {
-                        IteratorResultElement::ClosingTag { name, last_pos } => {
+                        IteratorResultElement::ClosingTag { name, last_pos, starting_pos } => {
                             if tag_extraction_result.tag != &name[1..] {
                                 panic!(
                                     "Name of the closing tag ('{}') does not match name of the opening tag ('{}') at {}.",
@@ -335,8 +340,10 @@ impl<'a> MutableElement<'a> {
                                     },
                                     modification_type: ModificationType::NONE,
                                     new_name: Option::None,
-                                    start: tag_extraction_result.search_start,
-                                    end: last_pos,
+                                    opening_start: tag_extraction_result.search_start,
+                                    opening_end: attributes.search_end,
+                                    closing_start: starting_pos,
+                                    closing_end: last_pos,
                                 }),
                                 last_char: '_',
                                 last_pos,
@@ -386,7 +393,7 @@ impl<'a> Attribute<'a> {
 /// * `iter` mutable reference to an iterator. Current position must be set to after the tag of the element, and before start of the attributes
 fn extract_attributes<'a>(
     source: &'a str,
-    iter: &mut impl Iterator<Item = (usize, char)>,
+    iter: &mut impl Iterator<Item=(usize, char)>,
 ) -> AttributeExtractionResult<'a> {
     // Find area containing the attributes
 
@@ -477,7 +484,7 @@ fn extract_attributes<'a>(
 /// On Success: A Result:Ok containing a PatternSearchResult
 /// On failure: A string indicating what went wrong
 fn find_pattern<'a>(
-    iter: &mut impl Iterator<Item = (usize, char)>,
+    iter: &mut impl Iterator<Item=(usize, char)>,
     pattern: &str,
 ) -> Result<PatternSearchResult, &'a str> {
     let mut pattern_iter = pattern.chars();
@@ -527,7 +534,7 @@ fn find_pattern<'a>(
 /// A `Result::Ok` containing the tag if successful. Otherwise,a `Result::Err` containing an error code
 fn extract_tag<'a>(
     source: &'a str,
-    iter: &mut impl Iterator<Item = (usize, char)>,
+    iter: &mut impl Iterator<Item=(usize, char)>,
     beginning_additional_char: usize, // How many characters from before the beginning should be added
 ) -> Result<TagExtractionResult<'a>, &'a str> {
     let name_start: usize;
@@ -563,7 +570,7 @@ fn extract_tag<'a>(
 
     return Result::Ok(TagExtractionResult {
         tag: &source[name_start - beginning_additional_char..name_end],
-        search_start: search_start -1, // compensates for starting at the second symbol
+        search_start: search_start - 1, // compensates for starting at the second symbol
         search_end: current.unwrap().0,
         last_char_higher_than: current.is_some() && current.unwrap().1 == '>',
     });

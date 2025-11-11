@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
     use crate::mutable_html_element::parser::*;
     use crate::mutable_html_element::*;
     use std::fs;
@@ -45,7 +46,7 @@ mod tests {
 
         match result {
             MutableElement::Root(elems) => match &elems[0] {
-                MutableElement::Named(e) => {
+                MutableElement::SelfClosing(e) => {
                     assert_eq!(e.name, "img");
                     assert_eq!(e.start, 0);
                     assert_eq!(e.end, 4);
@@ -112,8 +113,10 @@ mod tests {
             MutableElement::Root(elems) => match &elems[0] {
                 MutableElement::Named(v) => {
                     assert_eq!(v.name, "p");
-                    assert_eq!(v.start, 0);
-                    assert_eq!(v.end, 6);
+                    assert_eq!(v.opening_start, 0);
+                    assert_eq!(v.opening_end, 2);
+                    assert_eq!(v.closing_start, 3);
+                    assert_eq!(v.closing_end, 6);
                 }
                 _ => panic!("Expected named element"),
             },
@@ -141,7 +144,7 @@ mod tests {
 
         match &result {
             MutableElement::Root(elems) => match &elems[0] {
-                MutableElement::Named(v) => {
+                MutableElement::SelfClosing(v) => {
                     assert!(v.name == "img");
                     assert_eq!(v.attributes.len(), 3);
                     assert_eq!(v.attributes[0].name, "src");
@@ -189,8 +192,10 @@ mod tests {
             MutableElement::Root(elems) => match &elems[0] {
                 MutableElement::Named(v) => {
                     assert_eq!(v.name, "div");
-                    assert_eq!(v.start, 0);
-                    assert_eq!(v.end, 33);
+                    assert_eq!(v.opening_start, 0);
+                    assert_eq!(v.opening_end, 15);
+                    assert_eq!(v.closing_start, 29);
+                    assert_eq!(v.closing_end, 33);
 
                     match &v.attributes[0].value {
                         TerminalValue::Float(87.0) => {}
@@ -334,6 +339,30 @@ mod tests {
                 }
             },
             _ => panic!("Expected root element!"),
+        }
+    }
+    
+    #[test]
+    fn test_self_closing_element() {
+        let source: &str = "<link href=\"main.css\" rel=\"stylesheet\" />";
+
+        let result = MutableElement::from_string(&source);
+        
+        match &result {
+            MutableElement::Root(r) => {
+                match &r[0] {
+                    MutableElement::SelfClosing(sc) => {
+                        assert_eq!(sc.name, "link");
+                        assert_eq!(sc.attributes.len(), 2);
+                        assert_eq!(sc.start, 0);
+                        assert_eq!(sc.end, 40)
+                    }
+                    _ => {panic! {"Expected self closing element!"}},
+                }
+            }
+            _other => {
+                panic!("Expected root element!");
+            }
         }
     }
 

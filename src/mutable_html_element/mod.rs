@@ -18,12 +18,27 @@ pub enum ModificationType {
 
 pub enum MutableElement<'a> {
     Named(MutableNamedElement<'a>),
+    SelfClosing(MutableSelfClosingNamedElement<'a>),
     Text(MutableTextElement<'a>),
     Comment(MutableCommentElement<'a>),
     Root(Vec<MutableElement<'a>>),
 }
 
+/// A mutable, non self-closing element
 pub struct MutableNamedElement<'a> {
+    pub name: &'a str,
+    pub attributes: Vec<Attribute<'a>>, // TODO: make modifiable
+    pub child: Child<'a>,
+    modification_type: ModificationType,
+    new_name: Option<String>,
+    opening_start: usize,
+    opening_end: usize,
+    closing_start: usize,
+    closing_end: usize,
+}
+
+/// A mutable self-closing element
+pub struct MutableSelfClosingNamedElement<'a> {
     pub name: &'a str,
     pub attributes: Vec<Attribute<'a>>, // TODO: make modifiable
     pub child: Child<'a>,
