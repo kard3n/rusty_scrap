@@ -222,6 +222,8 @@ impl<'a> MutableElement<'a> {
                             name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: Child::None,
+                            modification_type: ModificationType::NONE,
+                            new_name: Option::None,
                             start: tag_extraction_result.search_start,
                             end: attributes.search_end,
                         }),
@@ -257,6 +259,8 @@ impl<'a> MutableElement<'a> {
                                         } - pattern.len()
                                             + 1],
                                     ),
+                                    modification_type: ModificationType::NONE,
+                                    new_name: Option::None,
                                     start: tag_extraction_result.search_start,
                                     end: search_result_ok.search_end,
                                 }),
@@ -279,6 +283,8 @@ impl<'a> MutableElement<'a> {
                             name: tag_extraction_result.tag,
                             attributes: attributes.attributes,
                             child: Child::Nodes(child_nodes),
+                            modification_type: ModificationType::NONE,
+                            new_name: Option::None,
                             start: tag_extraction_result.search_start,
                             end: attributes.search_end,
                         }),
@@ -327,6 +333,8 @@ impl<'a> MutableElement<'a> {
                                     } else {
                                         Child::None
                                     },
+                                    modification_type: ModificationType::NONE,
+                                    new_name: Option::None,
                                     start: tag_extraction_result.search_start,
                                     end: last_pos,
                                 }),

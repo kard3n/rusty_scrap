@@ -25,14 +25,16 @@ pub enum MutableElement<'a> {
 
 pub struct MutableNamedElement<'a> {
     pub name: &'a str,
-    pub attributes: Vec<Attribute<'a>>,
+    pub attributes: Vec<Attribute<'a>>, // TODO: make modifiable
     pub child: Child<'a>,
+    modification_type: ModificationType,
+    new_name: Option<String>,
     start: usize,
     end: usize,
 }
 
 pub struct MutableTextElement<'a> {
-    text: &'a str,
+    pub text: &'a str,
     start: usize,
     end: usize,
     modification: ModificationType,
