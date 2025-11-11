@@ -1,4 +1,5 @@
 pub mod parser;
+pub mod serializer;
 mod test;
 
 #[derive(Debug)]
@@ -35,7 +36,7 @@ pub struct MutableTextElement<'a> {
     start: usize,
     end: usize,
     modification: ModificationType,
-    new_text: String, // Contains a value if the element was modified
+    new_text: Option<String>, // Contains a value if the element was modified
 }
 
 pub struct MutableCommentElement<'a> {
@@ -43,7 +44,7 @@ pub struct MutableCommentElement<'a> {
     start: usize,
     end: usize,
     modification: ModificationType,
-    new_text: String, // Contains a value if the element was modified
+    new_text: Option<String>, // Contains a value if the element was modified
 }
 
 pub struct MutableRootElement<'a> {
