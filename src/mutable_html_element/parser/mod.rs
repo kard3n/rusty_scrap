@@ -99,7 +99,7 @@ impl<'a> MutableElement<'a> {
                         text: &source[start_pos..],
                         start: start_pos,
                         end: source.len() - 1,
-                        modification: ModificationType::NONE,
+                        modification_type: ModificationType::NONE,
                         new_text: Option::None,
                     }),
                     last_char: '_',
@@ -111,7 +111,7 @@ impl<'a> MutableElement<'a> {
                         text: &source[start_pos..v.0],
                         start: start_pos,
                         end: v.0 - 1,
-                        modification: ModificationType::NONE,
+                        modification_type: ModificationType::NONE,
                         new_text: Option::None,
                     }),
                     last_char: v.1,
@@ -188,7 +188,7 @@ impl<'a> MutableElement<'a> {
                                     } else {
                                         source.len()
                                     },
-                                    modification: ModificationType::NONE,
+                                    modification_type: ModificationType::NONE,
                                     new_text: Option::None,
                                 }),
                                 last_char: '>',

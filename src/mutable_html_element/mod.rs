@@ -16,6 +16,21 @@ pub enum ModificationType {
     NONE,   // Element was not modified
 }
 
+pub struct ParsedHTML<'a> {
+    original_content: String,
+    pub parsed_content: MutableElement<'a>,
+}
+
+impl ParsedHTML<'_> {
+    /// Creates a new ParsedHTML from a given string
+    pub fn from_string(input: &'_ str) -> ParsedHTML<'_> {
+        return ParsedHTML {
+            original_content: input.to_string(),
+            parsed_content: MutableElement::from_string(&input),
+        };
+    }
+}
+
 pub enum MutableElement<'a> {
     Named(MutableNamedElement<'a>),
     SelfClosing(MutableSelfClosingNamedElement<'a>),
@@ -52,7 +67,7 @@ pub struct MutableTextElement<'a> {
     pub text: &'a str,
     start: usize,
     end: usize,
-    modification: ModificationType,
+    modification_type: ModificationType,
     new_text: Option<String>, // Contains a value if the element was modified
 }
 
@@ -60,7 +75,7 @@ pub struct MutableCommentElement<'a> {
     pub text: &'a str,
     start: usize,
     end: usize,
-    modification: ModificationType,
+    modification_type: ModificationType,
     new_text: Option<String>, // Contains a value if the element was modified
 }
 
