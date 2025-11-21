@@ -40,6 +40,7 @@ pub enum MutableElement<'a> {
 }
 
 /// A mutable, non self-closing element
+/// Opening and ending positions are for the original content, not the modified version
 pub struct MutableNamedElement<'a> {
     pub name: &'a str,
     pub attributes: Vec<Attribute<'a>>, // TODO: make modifiable
@@ -53,6 +54,7 @@ pub struct MutableNamedElement<'a> {
 }
 
 /// A mutable self-closing element
+/// Start and end positions are for the original content, not the modified version
 pub struct MutableSelfClosingNamedElement<'a> {
     pub name: &'a str,
     pub attributes: Vec<Attribute<'a>>, // TODO: make modifiable
@@ -63,6 +65,8 @@ pub struct MutableSelfClosingNamedElement<'a> {
     end: usize,
 }
 
+/// A piece of text. Can be plain text of the HTML, or child of an element containing text
+/// Start and end positions are for the original content, not the modified version
 pub struct MutableTextElement<'a> {
     pub text: &'a str,
     start: usize,
@@ -71,6 +75,8 @@ pub struct MutableTextElement<'a> {
     new_text: Option<String>, // Contains a value if the element was modified
 }
 
+/// Represents a comment in the source HTML
+/// Start and end positions are for the original content, not the modified version
 pub struct MutableCommentElement<'a> {
     pub text: &'a str,
     start: usize,
