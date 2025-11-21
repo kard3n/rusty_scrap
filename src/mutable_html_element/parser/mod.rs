@@ -56,7 +56,11 @@ impl<'a> MutableElement<'a> {
                     result.push(element);
                     last_char_lower_than = last_char == '<';
                 }
-                IteratorResultElement::ClosingTag { name, last_pos, starting_pos } => {
+                IteratorResultElement::ClosingTag {
+                    name,
+                    last_pos,
+                    starting_pos,
+                } => {
                     panic!("Encountered closing tag as direct child of the root element");
                 }
                 IteratorResultElement::End => {
@@ -69,7 +73,7 @@ impl<'a> MutableElement<'a> {
     }
 
     fn from_iterator(
-        iter: &mut impl Iterator<Item=(usize, char)>,
+        iter: &mut impl Iterator<Item = (usize, char)>,
         source: &'a str,
         last_char_lower_than: bool,
     ) -> IteratorResultElement<'a> {
@@ -178,10 +182,10 @@ impl<'a> MutableElement<'a> {
                                         + tag_extraction_result.tag.len()
                                         + if last_char_lower_than { 0 } else { 1 }
                                         ..if result.result.is_some() {
-                                        result.result.unwrap().0 - 2
-                                    } else {
-                                        source.len()
-                                    }],
+                                            result.result.unwrap().0 - 2
+                                        } else {
+                                            source.len()
+                                        }],
                                     start: element_start,
                                     end: if result.result.is_some() {
                                         result.result.unwrap().0
@@ -248,20 +252,28 @@ impl<'a> MutableElement<'a> {
 
                     match search_result {
                         Ok(search_result_ok) => {
+                            let start: usize = search_result_ok.search_start;
+                            let end: usize = {
+                                if search_result_ok.result.is_some() {
+                                    search_result_ok.result.unwrap().0
+                                } else {
+                                    source.len()
+                                }
+                            } - pattern
+                                .len()
+                                + 1;
+                            
                             return IteratorResultElement::Element {
                                 element: MutableElement::Named(MutableNamedElement {
                                     name: tag_extraction_result.tag,
                                     attributes: attributes.attributes,
-                                    child: Child::Text(
-                                        &source[search_result_ok.search_start..{
-                                            if search_result_ok.result.is_some() {
-                                                search_result_ok.result.unwrap().0
-                                            } else {
-                                                source.len()
-                                            }
-                                        } - pattern.len()
-                                            + 1],
-                                    ),
+                                    child: Child::Text(MutableTextElement {
+                                        text: &source[start..end],
+                                        start,
+                                        end,
+                                        modification_type: ModificationType::ADD,
+                                        new_text: None,
+                                    }),
                                     modification_type: ModificationType::NONE,
                                     new_name: Option::None,
                                     opening_start: tag_extraction_result.search_start,
@@ -321,7 +333,11 @@ impl<'a> MutableElement<'a> {
 
                     // Check that the element was closed properly
                     match next_child {
-                        IteratorResultElement::ClosingTag { name, last_pos, starting_pos } => {
+                        IteratorResultElement::ClosingTag {
+                            name,
+                            last_pos,
+                            starting_pos,
+                        } => {
                             if tag_extraction_result.tag != &name[1..] {
                                 panic!(
                                     "Name of the closing tag ('{}') does not match name of the opening tag ('{}') at {}.",
@@ -393,7 +409,7 @@ impl<'a> Attribute<'a> {
 /// * `iter` mutable reference to an iterator. Current position must be set to after the tag of the element, and before start of the attributes
 fn extract_attributes<'a>(
     source: &'a str,
-    iter: &mut impl Iterator<Item=(usize, char)>,
+    iter: &mut impl Iterator<Item = (usize, char)>,
 ) -> AttributeExtractionResult<'a> {
     // Find area containing the attributes
 
@@ -484,7 +500,7 @@ fn extract_attributes<'a>(
 /// On Success: A Result:Ok containing a PatternSearchResult
 /// On failure: A string indicating what went wrong
 fn find_pattern<'a>(
-    iter: &mut impl Iterator<Item=(usize, char)>,
+    iter: &mut impl Iterator<Item = (usize, char)>,
     pattern: &str,
 ) -> Result<PatternSearchResult, &'a str> {
     let mut pattern_iter = pattern.chars();
@@ -534,7 +550,7 @@ fn find_pattern<'a>(
 /// A `Result::Ok` containing the tag if successful. Otherwise,a `Result::Err` containing an error code
 fn extract_tag<'a>(
     source: &'a str,
-    iter: &mut impl Iterator<Item=(usize, char)>,
+    iter: &mut impl Iterator<Item = (usize, char)>,
     beginning_additional_char: usize, // How many characters from before the beginning should be added
 ) -> Result<TagExtractionResult<'a>, &'a str> {
     let name_start: usize;

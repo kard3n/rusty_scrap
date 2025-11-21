@@ -325,9 +325,11 @@ mod tests {
             MutableElement::Root(elems) => match &elems[0] {
                 MutableElement::Named(n) => {
                     assert_eq!(n.name, "script");
-                    match n.child {
+                    match &n.child {
                         Child::Text(content) => {
-                            assert_eq!(content, expected);
+                            assert_eq!(content.text, expected);
+                            assert_eq!(content.start, 8);
+                            assert_eq!(content.end, 44);
                         }
                         _ => {
                             panic! {"Expected nodes, got None"}

@@ -86,7 +86,7 @@ pub struct MutableRootElement<'a> {
 pub enum Child<'a> {
     None,                           // Does not have a child
     Nodes(Vec<MutableElement<'a>>), // One or more children
-    Text(&'a str),                  // Text content, like in <script>
+    Text(MutableTextElement<'a>),                  // Text content, like in <script>
 }
 
 // TODO: add stand and end
